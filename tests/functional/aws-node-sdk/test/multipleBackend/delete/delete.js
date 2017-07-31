@@ -1,7 +1,7 @@
 const assert = require('assert');
-const withV4 = require('../support/withV4');
-const BucketUtility = require('../../lib/utility/bucket-util');
-const { config } = require('../../../../../lib/Config');
+const withV4 = require('../../support/withV4');
+const BucketUtility = require('../../../lib/utility/bucket-util');
+const { config } = require('../../../../../../lib/Config');
 
 const bucket = 'buckettestmultiplebackenddelete';
 const memObject = `memObject-${Date.now()}`;

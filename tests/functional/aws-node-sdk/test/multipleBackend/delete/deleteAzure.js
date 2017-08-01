@@ -13,6 +13,7 @@ const keys = getAzureKeys();
 const azureClient = getAzureClient();
 
 const normalBody = Buffer.from('I am a body', 'utf8');
+const azureTimeout = 20000;
 
 
 const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
@@ -20,7 +21,7 @@ const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
 
 describeSkipIfNotMultiple('Multiple backend delete object from Azure',
 function testSuite() {
-    this.timeout(30000);
+    this.timeout(250000);
     withV4(sigCfg => {
         let bucketUtil;
         let s3;
@@ -71,17 +72,18 @@ function testSuite() {
                     }, err => {
                         assert.equal(err, null, 'Expected success ' +
                             `but got error ${err}`);
-                        s3.getObject({ Bucket: azureContainerName,
-                        Key: keyName }, err => {
-                            assert.strictEqual(err.code, 'NoSuchKey',
-                            'Expected error but got success');
-                            done();
-                        });
+                        setTimeout(() =>
+                        azureClient.getBlobProperties(azureContainerName,
+                        keyName, err => {
+                            assert.strictEqual(err.statusCode, 404);
+                            assert.strictEqual(err.code, 'NotFound');
+                            return done();
+                        }), azureTimeout);
                     });
                 });
             });
         });
-        describe('returning error', () => {
+        describe('returning no error', () => {
             const azureObject = uniqName(keyObject);
             before(done => {
                 s3.putObject({
@@ -111,6 +113,33 @@ function testSuite() {
                 }, err => {
                     assert.equal(err, null, 'Expected success but got ' +
                     `error ${err}`);
+                    done();
+                });
+            });
+        });
+
+        describe('returning error', () => {
+            const azureObject = uniqName(keyObject);
+            before(done => {
+                s3.putObject({
+                    Bucket: azureContainerName,
+                    Key: azureObject,
+                    Body: normalBody,
+                    Metadata: {
+                        'scal-location-constraint': azureLocation,
+                    },
+                }, done);
+            });
+
+            it('should return error on deleting an object with a version ID',
+            done => {
+                s3.deleteObject({
+                    Bucket: azureContainerName,
+                    Key: azureObject,
+                    VersionId: 'versionid',
+                }, err => {
+                    assert.strictEqual(err.statusCode, 501);
+                    assert.strictEqual(err.code, 'NotImplemented');
                     done();
                 });
             });

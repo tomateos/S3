@@ -131,13 +131,14 @@ function testSuite() {
                 }, done);
             });
 
-            it('should return error on deleting an object with a version ID',
+            it.only('should return error on deleting an object with a version ID',
             done => {
                 s3.deleteObject({
                     Bucket: azureContainerName,
                     Key: azureObject,
                     VersionId: 'versionid',
                 }, err => {
+                    console.log('err!!!', err);
                     assert.strictEqual(err.statusCode, 501);
                     assert.strictEqual(err.code, 'NotImplemented');
                     done();

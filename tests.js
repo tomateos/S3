@@ -15,11 +15,11 @@ function spawnAndLog(cmd, isKillingServer, cb) {
         console.log(`child exited with code: ${exitCode}`);
         if (exitCode === 0) {
             if (isKillingServer) {
-                const killServer = spawn('kill -9 $(lsof -t -i:8000)',
+                const serverKiller = spawn('kill -9 $(lsof -t -i:8000)',
                   { shell: true });
-                return killServer.on('exit', exitKillServer => {
+                return serverKiller.on('exit', exitKillServer => {
                     if (exitKillServer === 0) {
-                        console.log(`killServer exited with code: ${exitCode}`);
+                        console.log(`serverKiller exited - code: ${exitCode}`);
                         return cb();
                     }
                     return cb(`Failed killing server: ${cmd}`);
@@ -31,11 +31,7 @@ function spawnAndLog(cmd, isKillingServer, cb) {
     });
 }
 
-// const coco = '0';
-// process.env.CIRCLE_NODE_INDEX
 if (process.env.CIRCLE_NODE_INDEX === '0') {
-    // log(execSync('npm run --silent lint -- --max-warnings 0'));
-    // log('1!!!');
     async.series([
         next => spawnAndLog('npm run --silent lint -- --max-warnings 0', false,
         next),
@@ -63,47 +59,107 @@ if (process.env.CIRCLE_NODE_INDEX === '0') {
           '& bash wait_for_local_port.bash 8000 40 ' +
           '&& S3DATA=multiple npm run ft_awssdk', true, next),
         // Run S3 with multiple data backends + KMS Encryption; run ft_awssdk
-        // next => spawnAndLog(
-        //   'S3BACKEND=mem MPU_TESTING=yes S3DATA=multiple npm start ' +
-        //   '> $CIRCLE_ARTIFACTS/server_multiple_kms_awssdk.txt ' +
-        //   '& bash wait_for_local_port.bash 8000 40 ' +
-        //   '&& S3DATA=multiple ENABLE_KMS_ENCRYPTION=true npm run ft_awssdk',
-        //   next),
-        // // Run S3 with mem Backend ; run ft_tests
-        // next => spawnAndLog(
-        //   'S3BACKEND=mem npm start ' +
-        //   '> $CIRCLE_ARTIFACTS/server_mem_java.txt ' +
-        //   '& bash wait_for_local_port.bash 8000 40 ' +
-        //   '&& cd ./tests/functional/jaws && mvn test', next),
-        // next => spawnAndLog(
-        //   'S3BACKEND=mem npm start' +
-        //   '> $CIRCLE_ARTIFACTS/server_mem_fog.txt ' +
-        //   '& bash wait_for_local_port.bash 8000 40 ' +
-        //   '&& cd tests/functional/fog && rspec tests.rb', next),
-        // next => spawnAndLog(
-        //   'S3BACKEND=mem MPU_TESTING=yes npm start ' +
-        //   '> $CIRCLE_ARTIFACTS/server_mem_awssdk.txt ' +
-        //   '& bash wait_for_local_port.bash 8000 40 ' +
-        //   '&& npm run ft_awssdk', next),
-        // next => spawnAndLog(
-        //   'S3BACKEND=mem npm start' +
-        //   '> $CIRCLE_ARTIFACTS/server_mem_s3cmd.txt ' +
-        //   '& bash wait_for_local_port.bash 8000 40 ' +
-        //   '&& npm run ft_s3cmd', next),
-        // next => spawnAndLog(
-        //   'S3BACKEND=mem npm start' +
-        //   '> $CIRCLE_ARTIFACTS/server_mem_s3curl.txt ' +
-        //   '& bash wait_for_local_port.bash 8000 40 ' +
-        //   '&& npm run ft_s3curl', next),
-        // next => spawnAndLog(
-        //   'S3BACKEND=mem npm start ' +
-        //   '> $CIRCLE_ARTIFACTS/server_mem_rawnode.txt ' +
-        //   '& bash wait_for_local_port.bash 8000 40 ' +
-        //   '&& npm run ft_node', next),
+        next => spawnAndLog(
+          'S3BACKEND=mem MPU_TESTING=yes S3DATA=multiple npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_multiple_kms_awssdk.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& S3DATA=multiple ENABLE_KMS_ENCRYPTION=true npm run ft_awssdk',
+          true, next),
+        // Run S3 with mem Backend ; run ft_tests
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_mem_java.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& cd ./tests/functional/jaws && mvn test', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start' +
+          '> $CIRCLE_ARTIFACTS/server_mem_fog.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& cd tests/functional/fog && rspec tests.rb', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem MPU_TESTING=yes npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_mem_awssdk.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_awssdk', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start' +
+          '> $CIRCLE_ARTIFACTS/server_mem_s3cmd.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_s3cmd', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start' +
+          '> $CIRCLE_ARTIFACTS/server_mem_s3curl.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_s3curl', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_mem_rawnode.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_node', true, next),
         // Run S3 with mem Backend + KMS Encryption ; run ft_tests
+        next => spawnAndLog(
+          'S3BACKEND=mem MPU_TESTING=yes npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_mem_kms_awssdk.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& ENABLE_KMS_ENCRYPTION=true npm run ft_awssdk', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_mem_kms_s3cmd.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& ENABLE_KMS_ENCRYPTION=true npm run ft_s3cmd', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_mem_kms_s3curl.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& ENABLE_KMS_ENCRYPTION=true npm run ft_s3curl', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_mem_kms_rawnode.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& ENABLE_KMS_ENCRYPTION=true npm run ft_node', true, next),
+        //  Run S3 with file Backend ; run ft_tests
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem MPU_TESTING=yes npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_awssdk.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_awssdk', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_s3cmd.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_s3cmd', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_s3curl.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_s3curl', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_rawnode.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& npm run ft_node', true, next),
+        // Run S3 with file Backend + KMS Encryption ; run ft_tests
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem MPU_TESTING=yes npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_kms_awssdk.txt ' +
+          '& bash wait_for_local_port.bash 8000 40', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_kms_s3cmd.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& ENABLE_KMS_ENCRYPTION=true npm run ft_s3cmd', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_kms_s3curl.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& ENABLE_KMS_ENCRYPTION=true npm run ft_s3curl', true, next),
+        next => spawnAndLog(
+          'S3BACKEND=file S3VAULT=mem npm start ' +
+          '> $CIRCLE_ARTIFACTS/server_file_kms_rawnode.txt ' +
+          '& bash wait_for_local_port.bash 8000 40 ' +
+          '&& ENABLE_KMS_ENCRYPTION=true npm run ft_node', true, next),
     ], err => {
         assert.equal(err, null, `Expected success but got error ${err}`);
-        console.log('END!!!');
         process.exit();
     });
 }

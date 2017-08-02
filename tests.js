@@ -16,16 +16,15 @@ function spawnAndLog(cmd, cb) {
         if (exitCode === 0) {
             const killServer = spawn('kill -9 $(lsof -t -i:8000)',
               { shell: true });
-            killServer.on('exit', exitKillServer => {
+            return killServer.on('exit', exitKillServer => {
                 if (exitKillServer === 0) {
                     console.log(`killServer exited with code: ${exitCode}`);
                     return cb();
                 }
                 return cb(`Failed killing server: ${cmd}`);
             });
-        } else {
-            cb(`Failed: ${cmd}`);
         }
+        return cb(`Failed: ${cmd}`);
     });
 }
 

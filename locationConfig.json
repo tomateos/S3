@@ -13,6 +13,16 @@
             "bucketMatch": true,
             "credentialsProfile": "default"
         }
+    },
+    "gcp-test": {
+        "type": "gcp",
+        "legacyAwsBehavior": true,
+        "details": {
+            "gcpEndpoint": "https://www.googleapis.com/storage/v1",
+            "projectId": "zenko-hackathon",
+            "keyFilename": "~/.config/gcloud/scality_gcp.json",
+            "bucketMatch": true,
+            "gcpBucketName": "gcp_zenko_bucket",
+        }
     }
-
 }

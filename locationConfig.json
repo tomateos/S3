@@ -22,7 +22,7 @@
             "projectId": "zenko-hackathon",
             "keyFilename": "~/.config/gcloud/scality_gcp.json",
             "bucketMatch": true,
-            "gcpBucketName": "gcp_zenko_bucket",
+            "gcpBucketName": "gcp_zenko_bucket"
         }
     }
 }

@@ -19,10 +19,10 @@
         "legacyAwsBehavior": true,
         "details": {
             "gcpEndpoint": "https://www.googleapis.com/storage/v1",
+            "bucketMatch": false,
             "projectId": "zenko-hackathon",
-            "keyFilename": "~/.config/gcloud/scality_gcp.json",
-            "bucketMatch": true,
-            "gcpBucketName": "gcp_zenko_bucket"
+            "gcpBucketName": "my-zenko-bucket",
+            "credentialsEnv": "GCP_CRED"
         }
     }
 }

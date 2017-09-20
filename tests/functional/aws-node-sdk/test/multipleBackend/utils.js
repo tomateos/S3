@@ -1,5 +1,6 @@
 
 const azure = require('azure-storage');
+const crypto = require('crypto');
 
 const { config } = require('../../../../../lib/Config');
 
@@ -78,7 +79,7 @@ utils.getAzureKeys = () => {
         {
             describe: 'big',
             name: `bigkey-${Date.now()}`,
-            body: new Buffer(10485760),
+            body: Buffer.alloc(10485760),
             MD5: 'f1c9645dbc14efddc7d8a322685f26eb',
         },
     ];
@@ -89,5 +90,13 @@ utils.getAzureKeys = () => {
 // from base64 to hex
 utils.convertMD5 = contentMD5 =>
     Buffer.from(contentMD5, 'base64').toString('hex');
+
+utils.expectedETag = (body, getStringified = true) => {
+    const eTagValue = crypto.createHash('md5').update(body).digest('hex');
+    if (!getStringified) {
+        return eTagValue;
+    }
+    return `"${eTagValue}"`;
+};
 
 module.exports = utils;

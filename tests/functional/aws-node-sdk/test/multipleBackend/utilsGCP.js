@@ -1,5 +1,4 @@
 const gcp = require('google-cloud');
-const crypto = require('crypto');
 
 const { config } = require('../../../../../lib/Config');
 
@@ -14,39 +13,35 @@ utils.getGcpClient = () => {
     let gcpCredentials;
     let gcpClient;
 
-    if (process.env['GCP_CRED']) {
+    if (process.env[`${gcpLocation}_GCP_CRED`]) {
         isTestingGcp = true;
-        gcpCredentials = process.env['GCP_CRED'];
+        gcpCredentials = process.env[`${gcpLocation}_GCP_CRED`];
     } else if (config.locationConstraints[gcpLocation] &&
           config.locationConstraints[gcpLocation].details &&
           config.locationConstraints[gcpLocation].details.credentialsEnv) {
         isTestingGcp = true;
-        gcpCredentials = config.locationConstraints[gcpLocation].details
-            .credentialsEnv;
+        gcpCredentials =
+            config.locationConstraints[gcpLocation].details.credentialsEnv;
     } else {
         isTestingGcp = false;
     }
 
     if (isTestingGcp) {
-        gcpClient = gcp.storage(gcpCredentials);
+        gcpClient = gcp.storage( {
+            keyFilename: gcpCredentials
+        });
     }
-
     return gcpClient;
 };
 
 utils.getGcpBucketName = () => {
     let gcpBucketName;
 
-    if (isTestingGcp) {
-        if (config.locationConstraints[gcpLocation] &&
-            config.locationConstraints[gcpLocation].details &&
-            config.locationConstraints[gcpLocation].details.gcpBucketName) {
-            gcpBucketName = config.locationConstraints[gcpLocation].details
-                .gcpBucketName;
-            isTestingGcp = true;
-        } else {
-            isTestingGcp = false;
-        }
+    if (config.locationConstraints[gcpLocation] &&
+    config.locationConstraints[gcpLocation].details &&
+    config.locationConstraints[gcpLocation].details.gcpBucketName) {
+        gcpBucketName =
+            config.locationConstraints[gcpLocation].details.gcpBucketName;
     }
     return gcpBucketName;
 };
@@ -68,24 +63,14 @@ utils.getGcpKeys = () => {
         {
             describe: 'big',
             name: `bigkey-${Date.now()}`,
-            body: Buffer.alloc(10485760),
+            body: new Buffer(10485760),
             MD5: 'f1c9645dbc14efddc7d8a322685f26eb',
         },
     ];
     return keys;
 };
 
-// For contentMD5, Gcp requires base64 but AWS requires hex, so convert
-// from base64 to hex
 utils.convertMD5 = contentMD5 =>
-    Buffer.from(contentMD5, 'base64').toString('hex');
-
-utils.expectedETag = (body, getStringified = true) => {
-    const eTagValue = crypto.createHash('md5').update(body).digest('hex');
-    if (!getStringified) {
-        return eTagValue;
-    }
-    return `"${eTagValue}"`;
-};
+    Buffer.from(contentMd5, 'base64').toString('hex');
 
 module.exports = utils;

@@ -19,7 +19,7 @@
         "legacyAwsBehavior": true,
         "details": {
             "gcpEndpoint": "https://www.googleapis.com/storage/v1",
-            "bucketMatch": false,
+            "bucketMatch": true,
             "projectId": "zenko-hackathon",
             "gcpBucketName": "my-zenko-bucket",
             "credentialsEnv": "GCP_CRED"

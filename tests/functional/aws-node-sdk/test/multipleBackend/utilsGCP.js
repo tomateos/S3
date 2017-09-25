@@ -19,9 +19,12 @@ utils.getGcpClient = () => {
     } else if (config.locationConstraints[gcpLocation] &&
           config.locationConstraints[gcpLocation].details &&
           config.locationConstraints[gcpLocation].details.credentialsEnv) {
+        let locationObj = config.locationConstraints[gcpLocation];
         isTestingGcp = true;
         gcpCredentials =
-            config.locationConstraints[gcpLocation].details.credentialsEnv;
+            process.env[`${locationObj.details.credentialsEnv}`] ?
+            process.env[`${locationObj.details.credentialsEnv}`] :
+            locationObj.details.keyFilename;
     } else {
         isTestingGcp = false;
     }

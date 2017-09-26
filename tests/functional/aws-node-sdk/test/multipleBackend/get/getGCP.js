@@ -10,8 +10,8 @@ const gcpLocation = 'gcp-test';
 const gcpBucket = getGcpBucketName();
 const gcpClient = getGcpClient();
 const gcpKeys = getGcpKeys();
+const keyObject = 'getgcp';
 
-const normalKey = `test-getgcp${new Date().getTime()}`;
 const normalBody = Buffer.from('I am a body', 'utf8');
 const normalMD5 = 'be747eb4b75517bf6b3cf7c5fbb62f3a';
 
@@ -83,17 +83,18 @@ function testSuite() {
         });
 
         describe('returning error', () => {
+            const gcpObject = uniqName(keyObject);
             before(done => {
                 s3.putObject({
                     Bucket: gcpBucket,
-                    Key: normalKey,
+                    Key: gcpObject,
                     Body: normalBody,
                     Metadata: gcpMetadata,
                 }, err => {
                     assert.equal(err, null,
                         `Expected success but got error ${err}`);
                     let bucket = gcpClient.bucket(gcpBucket);
-                    let file = bucket.file(normalKey);
+                    let file = bucket.file(gcpObject);
 
                     file.exists((err, exists) => {
                         if (!err && exists) {
@@ -113,7 +114,7 @@ function testSuite() {
 
             it('should return an error on get done to object deleted from GCP',
             done => {
-                s3.getObject({ Bucket: gcpBucket, Key: normalKey },
+                s3.getObject({ Bucket: gcpBucket, Key: gcpObject},
                 err => {
                     assert.notEqual(err, null,
                         'Expected failure but got success');

@@ -74,6 +74,6 @@ utils.getGcpKeys = () => {
 };
 
 utils.convertMD5 = contentMD5 =>
-    Buffer.from(contentMd5, 'base64').toString('hex');
+    Buffer.from(contentMD5, 'base64').toString('hex');
 
 module.exports = utils;

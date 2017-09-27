@@ -4,7 +4,7 @@ const async = require('async');
 const BucketUtility = require('../../../lib/utility/bucket-util');
 const withV4 = require('../../support/withV4');
 const { config } = require('../../../../../../lib/Config');
-const { uniqName, getGcpClient, getGcpBucketName, getGcpKeys}
+const { uniqName, getGcpClient, getGcpBucketName, getGcpKeys }
     = require('../utilsGCP');
 
 const keyObject = 'deletegcp';
@@ -76,13 +76,13 @@ function testSuite() {
                         Bucket: gcpBucketName,
                         Key: keyName,
                     }, err => {
-                        assert.equal(err, null, 'Expected success ' + 
+                        assert.equal(err, null, 'Expected success ' +
                             `but got error ${err}`);
                         setTimeout(() => {
-                            let bucket = gcpClient.bucket(gcpBucketName);
-                            let file = bucket.file(keyName);
+                            const bucket = gcpClient.bucket(gcpBucketName);
+                            const file = bucket.file(keyName);
 
-                            file.download((err, contents) => {
+                            file.download(err => {
                                 assert.strictEqual(err.code, 404);
                                 assert.strictEqual(err.message,
                                     'Not Found');
@@ -95,7 +95,7 @@ function testSuite() {
         });
 
         describe('returning no error', () => {
-            let bucket = gcpClient.bucket(gcpBucketName);
+            const bucket = gcpClient.bucket(gcpBucketName);
             beforeEach(function beF(done) {
                 this.currentTest.gcpObject = uniqName(keyObject);
                 s3.putObject({
@@ -113,8 +113,8 @@ function testSuite() {
                             `but got error ${err}`);
                         assert.strictEqual(exists, true, 'Expected file exist' +
                             'to be true but got false');
-                        this.currentTest.file.delete((err, res) => {
-                            assert.equal(err, null, 'Expected success ' + 
+                        this.currentTest.file.delete(err => {
+                            assert.equal(err, null, 'Expected success ' +
                                 `but got error ${err}`);
                             done(err);
                         });
@@ -136,7 +136,7 @@ function testSuite() {
         });
 
         describe('Versioning:: ', () => {
-            let bucket = gcpClient.bucket(gcpBucketName);
+            const bucket = gcpClient.bucket(gcpBucketName);
             beforeEach(function beF(done) {
                 this.currentTest.gcpObject = uniqName(keyObject);
                 s3.putObject({
@@ -174,16 +174,16 @@ function testSuite() {
                         this.test.file.exists((err, exists) => {
                             assert.equal(err, null, 'Expected success ' +
                                 `but got error ${err}`);
-                            assert.strictEqual(exists, true, 'Expected file exist' +
-                                'to be true but got false');
+                            assert.strictEqual(exists, true,
+                                'Expected file exist to be true but got false');
                             this.test.file.download((err, res) => {
-                                assert.equal(err, null, 'Expected success ' + 
+                                assert.equal(err, null, 'Expected success ' +
                                     `but got error ${err}`);
                                 assert.deepStrictEqual(Buffer.from(res, 'utf8'),
                                     normalBody);
                                 return next();
                             });
-                        })
+                        });
                     },
                 ], done);
             });

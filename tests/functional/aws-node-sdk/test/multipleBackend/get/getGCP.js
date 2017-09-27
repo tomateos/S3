@@ -3,7 +3,7 @@ const assert = require('assert');
 const BucketUtility = require('../../../lib/utility/bucket-util');
 const withV4 = require('../../support/withV4');
 const { config } = require('../../../../../../lib/Config');
-const { uniqName, getGcpClient, getGcpBucketName, getGcpKeys } 
+const { uniqName, getGcpClient, getGcpBucketName, getGcpKeys }
     = require('../utilsGCP');
 
 const gcpLocation = 'gcp-test';
@@ -13,7 +13,6 @@ const gcpKeys = getGcpKeys();
 const keyObject = 'getgcp';
 
 const normalBody = Buffer.from('I am a body', 'utf8');
-const normalMD5 = 'be747eb4b75517bf6b3cf7c5fbb62f3a';
 
 const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
     || process.env.S3_END_TO_END) ? describe.skip : describe;
@@ -95,12 +94,12 @@ function testSuite() {
                 }, err => {
                     assert.equal(err, null,
                         `Expected success but got error ${err}`);
-                    let bucket = gcpClient.bucket(gcpBucket);
-                    let file = bucket.file(gcpObject);
+                    const bucket = gcpClient.bucket(gcpBucket);
+                    const file = bucket.file(gcpObject);
 
                     file.exists((err, exists) => {
                         if (!err && exists) {
-                            file.delete((err, apiResponse) => {
+                            file.delete(err => {
                                 assert.equal(err, null,
                                     `Expected success but got error ${err}`);
                                 done();
@@ -116,7 +115,7 @@ function testSuite() {
 
             it('should return an error on get done to object deleted from GCP',
             done => {
-                s3.getObject({ Bucket: gcpBucket, Key: gcpObject},
+                s3.getObject({ Bucket: gcpBucket, Key: gcpObject },
                 err => {
                     assert.notEqual(err, null,
                         'Expected failure but got success');

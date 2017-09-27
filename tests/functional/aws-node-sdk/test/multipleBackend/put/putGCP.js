@@ -1,5 +1,5 @@
 const assert = require('assert');
-const async = require('async')
+const async = require('async');
 
 const BucketUtility = require('../../../lib/utility/bucket-util');
 const withV4 = require('../../support/withV4');
@@ -31,8 +31,8 @@ let bucketUtil;
 let s3;
 
 function gcpGetCheck(objectKey, gcpMD5, gcpMetadata, cb) {
-    let bucket = gcpClient.bucket(gcpBucket);
-    let file = bucket.file(objectKey);
+    const bucket = gcpClient.bucket(gcpBucket);
+    const file = bucket.file(objectKey);
 
     file.getMetadata((err, metadata, res) => {
         assert.strictEqual(err, null, 'Expected success, got error ' +
@@ -41,8 +41,7 @@ function gcpGetCheck(objectKey, gcpMD5, gcpMetadata, cb) {
         assert.strictEqual(resMD5, gcpMD5);
         if (!res.metadata) {
             assert.deepStrictEqual({}, gcpMetadata);
-        }
-        else {
+        } else {
             assert.deepStrictEqual(res.metadata, gcpMetadata);
         }
         return cb();
@@ -193,10 +192,10 @@ describeF() {
                         next();
                     }),
                     next => {
-                        let bucket = gcpClient.bucket(gcpBucket);
-                        let file = bucket.file(this.test.keyName);
+                        const bucket = gcpClient.bucket(gcpBucket);
+                        const file = bucket.file(this.test.keyName);
 
-                        file.getMetadata((err, metadata, res) => {
+                        file.getMetadata(err => {
                             assert.strictEqual(err.code, 404);
                             next();
                         });

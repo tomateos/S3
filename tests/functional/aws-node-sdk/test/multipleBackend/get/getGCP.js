@@ -62,12 +62,14 @@ function testSuite() {
             describe(`${key.describe} size`, () => {
                 const testKey = `${key.name}-${Date.now()}`;
                 before(done => {
-                    s3.putObject({
-                        Bucket: gcpBucket,
-                        Key: testKey,
-                        Body: key.body,
-                        Metadata: gcpMetadata,
-                    }, done);
+                    setTimeout(() => {
+                        s3.putObject({
+                            Bucket: gcpBucket,
+                            Key: testKey,
+                            Body: key.body,
+                            Metadata: gcpMetadata,
+                        }, done);
+                    }, gcpTimeout);
                 });
 
                 it(`should get an ${key.describe} object from GCP`, done => {

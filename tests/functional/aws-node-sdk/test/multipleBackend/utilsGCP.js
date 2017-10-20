@@ -1,4 +1,4 @@
-const gcp = require('google-cloud');
+const GCP = require('@google-cloud/storage');
 
 const { config } = require('../../../../../lib/Config');
 
@@ -30,7 +30,7 @@ utils.getGcpClient = () => {
     }
 
     if (isTestingGcp) {
-        gcpClient = gcp.storage({
+        gcpClient = new GCP({
             keyFilename: gcpCredentials,
         });
     }

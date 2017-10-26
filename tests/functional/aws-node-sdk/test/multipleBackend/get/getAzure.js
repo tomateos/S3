@@ -3,21 +3,21 @@ const assert = require('assert');
 const BucketUtility = require('../../../lib/utility/bucket-util');
 const withV4 = require('../../support/withV4');
 
-const { uniqName, getAzureClient, getAzureContainerName,
-  getAzureKeys } = require('../utils');
+const {
+    describeSkipIfNotMultiple,
+    uniqName,
+    getAzureClient,
+    getAzureContainerName,
+    getAzureKeys,
+    azureLocation,
+} = require('../utils');
 
-const azureLocation = 'azuretest';
 const azureClient = getAzureClient();
 const azureContainerName = getAzureContainerName();
 const keys = getAzureKeys();
 const keyObject = 'getazure';
 
-const { config } = require('../../../../../../lib/Config');
-
 const normalBody = Buffer.from('I am a body', 'utf8');
-
-const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
-    || process.env.S3_END_TO_END) ? describe.skip : describe;
 
 const azureTimeout = 10000;
 
@@ -154,7 +154,7 @@ function testSuite() {
                     Bucket: azureContainerName,
                     Key: azureObject,
                 }, err => {
-                    assert.strictEqual(err.code, 'NetworkingError');
+                    assert.strictEqual(err.code, 'InternalError');
                     done();
                 });
             });

@@ -1,15 +1,11 @@
 const assert = require('assert');
 const async = require('async');
-const AWS = require('aws-sdk');
-const withV4 = require('../support/withV4');
-const BucketUtility = require('../../lib/utility/bucket-util');
-const { config } = require('../../../../../lib/Config');
-const { getRealAwsConfig } = require('../support/awsConfig');
-const { getAzureClient, getAzureContainerName, convertMD5 } =
-    require('./utils');
+const withV4 = require('../../support/withV4');
+const BucketUtility = require('../../../lib/utility/bucket-util');
+const { describeSkipIfNotMultiple, awsS3, awsBucket, getAzureClient,
+    getAzureContainerName, convertMD5, memLocation, fileLocation, awsLocation,
+    azureLocation } = require('../utils');
 
-const awsLocation = 'aws-test';
-const awsBucket = 'multitester555';
 const azureClient = getAzureClient();
 const azureContainerName = getAzureContainerName();
 const bucket = 'testmultbackendtagging';
@@ -22,12 +18,9 @@ const cloudTimeout = 10000;
 
 let bucketUtil;
 let s3;
-let awsS3;
-const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
-    || process.env.S3_END_TO_END) ? describe.skip : describe;
 
 const putParams = { Bucket: bucket, Body: body };
-const testBackends = ['mem', 'file', 'aws-test', 'azuretest'];
+const testBackends = [memLocation, fileLocation, awsLocation, azureLocation];
 const tagString = 'key1=value1&key2=value2';
 const putTags = {
     TagSet: [
@@ -42,6 +35,22 @@ const putTags = {
     ],
 };
 const tagObj = { key1: 'value1', key2: 'value2' };
+
+function getAndAssertObjectTags(tagParams, callback) {
+    return s3.getObjectTagging(tagParams, (err, res) => {
+        assert.strictEqual(res.TagSet.length, 2);
+        assert.strictEqual(res.TagSet[0].Key,
+            putTags.TagSet[0].Key);
+        assert.strictEqual(res.TagSet[0].Value,
+            putTags.TagSet[0].Value);
+        assert.strictEqual(res.TagSet[1].Key,
+            putTags.TagSet[1].Key);
+        assert.strictEqual(res.TagSet[1].Value,
+            putTags.TagSet[1].Value);
+        return callback();
+    });
+}
+
 
 function awsGet(key, tagCheck, isEmpty, isMpu, callback) {
     process.stdout.write('Getting object from AWS\n');
@@ -159,8 +168,6 @@ function testSuite() {
     this.timeout(80000);
     withV4(sigCfg => {
         beforeEach(() => {
-            const awsConfig = getRealAwsConfig(awsLocation);
-            awsS3 = new AWS.S3(awsConfig);
             bucketUtil = new BucketUtility('default', sigCfg);
             s3 = bucketUtil.s3;
             return s3.createBucketAsync({ Bucket: bucket })
@@ -274,7 +281,9 @@ function testSuite() {
                 });
             });
 
-            it('should return error on putting tags to object deleted from AWS',
+            it('should not return error putting tags to correct object ' +
+            'version in AWS, even if a delete marker was created directly ' +
+            'on AWS before tags are put',
             done => {
                 const key = `somekey-${Date.now()}`;
                 const params = Object.assign({ Key: key, Metadata:
@@ -289,7 +298,7 @@ function testSuite() {
                             Tagging: putTags };
                         process.stdout.write('Putting object tags\n');
                         s3.putObjectTagging(putTagParams, err => {
-                            assert.strictEqual(err.code, 'InternalError');
+                            assert.strictEqual(err, null);
                             done();
                         });
                     });
@@ -309,24 +318,13 @@ function testSuite() {
                     s3.putObject(params, err => {
                         assert.equal(err, null);
                         const tagParams = { Bucket: bucket, Key: key };
-                        s3.getObjectTagging(tagParams, (err, res) => {
-                            assert.strictEqual(res.TagSet.length, 2);
-                            assert.strictEqual(res.TagSet[0].Key,
-                                putTags.TagSet[0].Key);
-                            assert.strictEqual(res.TagSet[0].Value,
-                                putTags.TagSet[0].Value);
-                            assert.strictEqual(res.TagSet[1].Key,
-                                putTags.TagSet[1].Key);
-                            assert.strictEqual(res.TagSet[1].Value,
-                                putTags.TagSet[1].Value);
-                            done();
-                        });
+                        getAndAssertObjectTags(tagParams, done);
                     });
                 });
             });
 
-            it('should not return error on getting tags from object deleted ' +
-            'from AWS', done => {
+            it('should not return error on getting tags from object that has ' +
+            'had a delete marker put directly on AWS', done => {
                 const key = `somekey-${Date.now()}`;
                 const params = Object.assign({ Key: key, Tagging: tagString,
                     Metadata: { 'scal-location-constraint': awsLocation } },
@@ -338,10 +336,7 @@ function testSuite() {
                     awsS3.deleteObject({ Bucket: awsBucket, Key: key }, err => {
                         assert.equal(err, null);
                         const tagParams = { Bucket: bucket, Key: key };
-                        s3.getObjectTagging(tagParams, err => {
-                            assert.equal(err, null);
-                            done();
-                        });
+                        getAndAssertObjectTags(tagParams, done);
                     });
                 });
             });
@@ -367,8 +362,8 @@ function testSuite() {
                 });
             });
 
-            it('should return error on deleting tags from object deleted ' +
-            'from AWS', done => {
+            it('should not return error on deleting tags from object that ' +
+            'has had delete markers put directly on AWS', done => {
                 const key = `somekey-${Date.now()}`;
                 const params = Object.assign({ Key: key, Tagging: tagString,
                     Metadata: { 'scal-location-constraint': awsLocation } },
@@ -381,7 +376,7 @@ function testSuite() {
                         assert.equal(err, null);
                         const tagParams = { Bucket: bucket, Key: key };
                         s3.deleteObjectTagging(tagParams, err => {
-                            assert.strictEqual(err.code, 'InternalError');
+                            assert.strictEqual(err, null);
                             done();
                         });
                     });

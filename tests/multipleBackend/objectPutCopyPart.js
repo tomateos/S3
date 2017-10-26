@@ -24,24 +24,41 @@ const authInfo = makeAuthInfo(canonicalID);
 const namespace = 'default';
 
 const bucketName = 'superbucket9999999';
-const sourceObjName = 'supersourceobject';
-const destObjName = 'copycatobject';
 const mpuBucket = `${constants.mpuBucketPrefix}${bucketName}`;
 const body = Buffer.from('I am a body', 'utf8');
 
+const memLocation = 'mem-test';
+const fileLocation = 'file-test';
 const awsBucket = 'multitester555';
 const awsLocation = 'aws-test';
 const awsLocation2 = 'aws-test-2';
 const awsLocationMismatch = 'aws-test-mismatch';
-const awsParams = { Bucket: awsBucket, Key: destObjName };
-const awsParamsBucketMismatch = { Bucket: awsBucket, Key:
-  `${bucketName}/${destObjName}` };
 const partETag = 'be747eb4b75517bf6b3cf7c5fbb62f3a';
 
 const describeSkipIfE2E = process.env.S3_END_TO_END ? describe.skip : describe;
 
+function getSourceAndDestKeys() {
+    const timestamp = Date.now();
+    return {
+        sourceObjName: `supersourceobject-${timestamp}`,
+        destObjName: `copycatobject-${timestamp}`,
+    };
+}
+
+function getAwsParams(destObjName, uploadId) {
+    return { Bucket: awsBucket, Key: destObjName, UploadId: uploadId };
+}
+
+function getAwsParamsBucketMismatch(destObjName, uploadId) {
+    const params = getAwsParams(destObjName, uploadId);
+    params.Key = `${bucketName}/${destObjName}`;
+    return params;
+}
+
 function copyPutPart(bucketLoc, mpuLoc, srcObjLoc, requestHost, cb,
 errorPutCopyPart) {
+    const keys = getSourceAndDestKeys();
+    const { sourceObjName, destObjName } = keys;
     const post = bucketLoc ? '<?xml version="1.0" encoding="UTF-8"?>' +
         '<CreateBucketConfiguration ' +
         'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
@@ -140,7 +157,7 @@ errorPutCopyPart) {
                     assert.strictEqual(json.CopyPartResult.ETag[0],
                         `"${partETag}"`);
                     assert(json.CopyPartResult.LastModified);
-                    return cb(testUploadId);
+                    return cb(keys, testUploadId);
                 });
             });
     });
@@ -156,14 +173,14 @@ function assertPartList(partList, uploadId) {
 
 describeSkipIfE2E('ObjectCopyPutPart API with multiple backends',
 function testSuite() {
-    this.timeout(20000);
+    this.timeout(60000);
 
     beforeEach(() => {
         cleanup();
     });
 
     it('should copy part to mem based on mpu location', done => {
-        copyPutPart('file', 'mem', null, 'localhost', () => {
+        copyPutPart(fileLocation, memLocation, null, 'localhost', () => {
             // object info is stored in ds beginning at index one,
             // so an array length of two means only one object
             // was stored in mem
@@ -174,16 +191,17 @@ function testSuite() {
     });
 
     it('should copy part to file based on mpu location', done => {
-        copyPutPart('mem', 'file', null, 'localhost', () => {
+        copyPutPart(memLocation, fileLocation, null, 'localhost', () => {
             assert.strictEqual(ds.length, 2);
             done();
         });
     });
 
     it('should copy part to AWS based on mpu location', done => {
-        copyPutPart('mem', awsLocation, null, 'localhost', uploadId => {
+        copyPutPart(memLocation, awsLocation, null, 'localhost',
+        (keys, uploadId) => {
             assert.strictEqual(ds.length, 2);
-            const awsReq = Object.assign({ UploadId: uploadId }, awsParams);
+            const awsReq = getAwsParams(keys.destObjName, uploadId);
             s3.listParts(awsReq, (err, partList) => {
                 assertPartList(partList, uploadId);
                 s3.abortMultipartUpload(awsReq, err => {
@@ -196,7 +214,7 @@ function testSuite() {
     });
 
     it('should copy part to mem from AWS based on mpu location', done => {
-        copyPutPart(awsLocation, 'mem', null, 'localhost', () => {
+        copyPutPart(awsLocation, memLocation, null, 'localhost', () => {
             assert.strictEqual(ds.length, 2);
             assert.deepStrictEqual(ds[1].value, body);
             done();
@@ -204,7 +222,7 @@ function testSuite() {
     });
 
     it('should copy part to mem based on bucket location', done => {
-        copyPutPart('mem', null, null, 'localhost', () => {
+        copyPutPart(memLocation, null, null, 'localhost', () => {
             // ds length should be three because both source
             // and copied objects should be in mem
             assert.strictEqual(ds.length, 3);
@@ -214,7 +232,7 @@ function testSuite() {
     });
 
     it('should copy part to file based on bucket location', done => {
-        copyPutPart('file', null, null, 'localhost', () => {
+        copyPutPart(fileLocation, null, null, 'localhost', () => {
             // ds should be empty because both source and
             // coped objects should be in file
             assert.deepStrictEqual(ds, []);
@@ -223,9 +241,9 @@ function testSuite() {
     });
 
     it('should copy part to AWS based on bucket location', done => {
-        copyPutPart(awsLocation, null, null, 'localhost', uploadId => {
+        copyPutPart(awsLocation, null, null, 'localhost', (keys, uploadId) => {
             assert.deepStrictEqual(ds, []);
-            const awsReq = Object.assign({ UploadId: uploadId }, awsParams);
+            const awsReq = getAwsParams(keys.destObjName, uploadId);
             s3.listParts(awsReq, (err, partList) => {
                 assertPartList(partList, uploadId);
                 s3.abortMultipartUpload(awsReq, err => {
@@ -240,9 +258,9 @@ function testSuite() {
     it('should copy part an object on AWS location that has bucketMatch ' +
     'equals false to a mpu with a different AWS location', done => {
         copyPutPart(null, awsLocation, awsLocationMismatch, 'localhost',
-        uploadId => {
+        (keys, uploadId) => {
             assert.deepStrictEqual(ds, []);
-            const awsReq = Object.assign({ UploadId: uploadId }, awsParams);
+            const awsReq = getAwsParams(keys.destObjName, uploadId);
             s3.listParts(awsReq, (err, partList) => {
                 assertPartList(partList, uploadId);
                 s3.abortMultipartUpload(awsReq, err => {
@@ -257,10 +275,10 @@ function testSuite() {
     it('should copy part an object on AWS to a mpu with a different ' +
     'AWS location that has bucketMatch equals false', done => {
         copyPutPart(null, awsLocationMismatch, awsLocation, 'localhost',
-        uploadId => {
+        (keys, uploadId) => {
             assert.deepStrictEqual(ds, []);
-            const awsReq = Object.assign({ UploadId: uploadId },
-              awsParamsBucketMismatch);
+            const awsReq = getAwsParamsBucketMismatch(keys.destObjName,
+                uploadId);
             s3.listParts(awsReq, (err, partList) => {
                 assertPartList(partList, uploadId);
                 s3.abortMultipartUpload(awsReq, err => {
@@ -282,7 +300,7 @@ function testSuite() {
 
 
     it('should copy part to file based on request endpoint', done => {
-        copyPutPart(null, null, 'mem', 'localhost', () => {
+        copyPutPart(null, null, memLocation, 'localhost', () => {
             assert.strictEqual(ds.length, 2);
             done();
         });

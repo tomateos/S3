@@ -4,21 +4,17 @@ const async = require('async');
 const { s3middleware } = require('arsenal');
 const withV4 = require('../../support/withV4');
 const BucketUtility = require('../../../lib/utility/bucket-util');
-const { expectedETag, uniqName, getAzureClient, getAzureContainerName,
-    convertMD5 } = require('../utils');
-const { config } = require('../../../../../../lib/Config');
+const { describeSkipIfNotMultiple, expectedETag, uniqName, getAzureClient,
+    getAzureContainerName, convertMD5, azureLocation, azureLocationMismatch }
+    = require('../utils');
 const azureMpuUtils = s3middleware.azureHelper.mpuUtils;
 const maxSubPartSize = azureMpuUtils.maxSubPartSize;
 const getBlockId = azureMpuUtils.getBlockId;
 
-const azureLocation = 'azuretest';
 const keyObject = 'putazure';
 const azureClient = getAzureClient();
 const azureContainerName = getAzureContainerName();
 const expectedMD5 = 'a63c90cc3684ad8b0a2176a6a8fe9005';
-
-const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
-    || process.env.S3_END_TO_END) ? describe.skip : describe;
 
 let bucketUtil;
 let s3;
@@ -309,6 +305,79 @@ describeF() {
                     `Azure: ${err}`);
                     azureCheck(this.test.key, done);
                 });
+            });
+        });
+    });
+});
+
+describeSkipIfNotMultiple('MultipleBackend put part to AZURE location with ' +
+'bucketMatch sets to false', function
+describeF() {
+    this.timeout(80000);
+    withV4(sigCfg => {
+        beforeEach(function beforeFn() {
+            this.currentTest.key = uniqName(keyObject);
+            bucketUtil = new BucketUtility('default', sigCfg);
+            s3 = bucketUtil.s3;
+        });
+        describe('with bucket location header', () => {
+            beforeEach(function beforeEachFn(done) {
+                async.waterfall([
+                    next => s3.createBucket({ Bucket: azureContainerName,
+                    }, err => next(err)),
+                    next => s3.createMultipartUpload({
+                        Bucket: azureContainerName,
+                        Key: this.currentTest.key,
+                        Metadata: { 'scal-location-constraint':
+                        azureLocationMismatch },
+                    }, (err, res) => {
+                        if (err) {
+                            return next(err);
+                        }
+                        this.currentTest.uploadId = res.UploadId;
+                        return next();
+                    }),
+                ], done);
+            });
+
+            afterEach(function afterEachFn(done) {
+                async.waterfall([
+                    next => s3.abortMultipartUpload({
+                        Bucket: azureContainerName,
+                        Key: this.currentTest.key,
+                        UploadId: this.currentTest.uploadId,
+                    }, err => next(err)),
+                    next => s3.deleteBucket({ Bucket: azureContainerName },
+                      err => next(err)),
+                ], err => {
+                    assert.equal(err, null, `Error aborting MPU: ${err}`);
+                    done();
+                });
+            });
+
+            it('should put block to AZURE location with bucketMatch' +
+            ' sets to false', function itFn(done) {
+                const body20 = Buffer.alloc(20);
+                const params = {
+                    Bucket: azureContainerName,
+                    Key: this.test.key,
+                    UploadId: this.test.uploadId,
+                    PartNumber: 1,
+                    Body: body20,
+                };
+                const parts = [{ partnbr: 1, subpartnbr: 0,
+                    size: 20 }];
+                async.waterfall([
+                    next => s3.uploadPart(params, (err, res) => {
+                        const eTagExpected =
+                        '"441018525208457705bf09a8ee3c1093"';
+                        assert.strictEqual(res.ETag, eTagExpected);
+                        return next(err);
+                    }),
+                    next => checkSubPart(
+                      `${azureContainerName}/${this.test.key}`,
+                      this.test.uploadId, parts, next),
+                ], done);
             });
         });
     });

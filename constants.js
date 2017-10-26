@@ -105,8 +105,12 @@ const constants = {
 
     // user metadata header to set object locationConstraint
     objectLocationConstraintHeader: 'x-amz-meta-scal-location-constraint',
-    // eslint-disable-next-line camelcase
-    externalBackends: { aws_s3: true, azure: true, gcp: true },
+    /* eslint-disable camelcase */
+    externalBackends: { aws_s3: true, azure: true },
+    versioningNotImplBackends: { azure: true },
+    mpuMDStoredExternallyBackend: { aws_s3: true },
+    /* eslint-enable camelcase */
+    mpuMDStoredOnS3Backend: { azure: true },
 };
 
 module.exports = constants;

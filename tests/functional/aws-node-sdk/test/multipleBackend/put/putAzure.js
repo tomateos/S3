@@ -3,12 +3,18 @@ const async = require('async');
 
 const withV4 = require('../../support/withV4');
 const BucketUtility = require('../../../lib/utility/bucket-util');
-const { uniqName, getAzureClient, getAzureContainerName, getAzureKeys,
-    convertMD5 }
-  = require('../utils');
-const { config } = require('../../../../../../lib/Config');
+const {
+    describeSkipIfNotMultiple,
+    uniqName,
+    getAzureClient,
+    getAzureContainerName,
+    getAzureKeys,
+    convertMD5,
+    fileLocation,
+    azureLocation,
+    azureLocationMismatch,
+} = require('../utils');
 
-const azureLocation = 'azuretest';
 const keyObject = 'putazure';
 const azureClient = getAzureClient();
 const azureContainerName = getAzureContainerName();
@@ -16,9 +22,6 @@ const { versioningEnabled } = require('../../../lib/utility/versioning-util');
 
 const normalBody = Buffer.from('I am a body', 'utf8');
 const normalMD5 = 'be747eb4b75517bf6b3cf7c5fbb62f3a';
-
-const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
-    || process.env.S3_END_TO_END) ? describe.skip : describe;
 
 const keys = getAzureKeys();
 /* eslint-disable camelcase */
@@ -116,6 +119,45 @@ describeF() {
                 });
             });
 
+            it('should put a object to Azure location with bucketMatch=false',
+            function itF(done) {
+                const params = {
+                    Bucket: azureContainerName,
+                    Key: this.test.keyName,
+                    Metadata: { 'scal-location-constraint':
+                    azureLocationMismatch },
+                    Body: normalBody,
+                };
+                const azureMetadataMismatch = {
+                    /* eslint-disable camelcase */
+                    x_amz_meta_scal_location_constraint: azureLocationMismatch,
+                    /* eslint-enable camelcase */
+                };
+                s3.putObject(params, err => {
+                    assert.equal(err, null, 'Expected success, ' +
+                    `got error ${err}`);
+                    setTimeout(() =>
+                        azureGetCheck(
+                          `${azureContainerName}/${this.test.keyName}`,
+                          normalMD5, azureMetadataMismatch,
+                        () => done()), azureTimeout);
+                });
+            });
+
+            it('should return error InternalError putting an invalid key ' +
+            'name to Azure', done => {
+                const params = {
+                    Bucket: azureContainerName,
+                    Key: '.',
+                    Metadata: { 'scal-location-constraint': azureLocation },
+                    Body: normalBody,
+                };
+                s3.putObject(params, err => {
+                    assert.strictEqual(err.code, 'InternalError');
+                    done();
+                });
+            });
+
             it('should return error NotImplemented putting a ' +
             'version to Azure', function itF(done) {
                 s3.putBucketVersioning({
@@ -171,7 +213,7 @@ describeF() {
                     next => s3.putObject(params, err => next(err)),
                     next => {
                         params.Metadata = { 'scal-location-constraint':
-                        'file' };
+                        fileLocation };
                         s3.putObject(params, err => setTimeout(() =>
                           next(err), azureTimeout));
                     },
@@ -183,7 +225,7 @@ describeF() {
                             `got error ${err}`);
                         assert.strictEqual(
                             res.Metadata['scal-location-constraint'],
-                            'file');
+                            fileLocation);
                         next();
                     }),
                     next => azureClient.getBlobProperties(azureContainerName,
@@ -200,7 +242,7 @@ describeF() {
                 const params = { Bucket: azureContainerName, Key:
                     this.test.keyName,
                     Body: normalBody,
-                    Metadata: { 'scal-location-constraint': 'file' } };
+                    Metadata: { 'scal-location-constraint': fileLocation } };
                 async.waterfall([
                     next => s3.putObject(params, err => next(err)),
                     next => {
@@ -213,6 +255,42 @@ describeF() {
                     next => azureGetCheck(this.test.keyName, normalMD5,
                       azureMetadata, next),
                 ], done);
+            });
+
+            describe('with ongoing MPU with same key name', () => {
+                beforeEach(function beFn(done) {
+                    s3.createMultipartUpload({
+                        Bucket: azureContainerName,
+                        Key: this.currentTest.keyName,
+                        Metadata: { 'scal-location-constraint': azureLocation },
+                    }, (err, res) => {
+                        assert.equal(err, null, `Err creating MPU: ${err}`);
+                        this.currentTest.uploadId = res.UploadId;
+                        done();
+                    });
+                });
+
+                afterEach(function afFn(done) {
+                    s3.abortMultipartUpload({
+                        Bucket: azureContainerName,
+                        Key: this.currentTest.keyName,
+                        UploadId: this.currentTest.uploadId,
+                    }, err => {
+                        assert.equal(err, null, `Err aborting MPU: ${err}`);
+                        done();
+                    });
+                });
+
+                it('should return InternalError', function itFn(done) {
+                    s3.putObject({
+                        Bucket: azureContainerName,
+                        Key: this.test.keyName,
+                        Metadata: { 'scal-location-constraint': azureLocation },
+                    }, err => {
+                        assert.strictEqual(err.code, 'InternalError');
+                        done();
+                    });
+                });
             });
         });
     });

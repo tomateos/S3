@@ -2,7 +2,13 @@ const assert = require('assert');
 
 const withV4 = require('../../support/withV4');
 const BucketUtility = require('../../../lib/utility/bucket-util');
-const { config } = require('../../../../../../lib/Config');
+const {
+    describeSkipIfNotMultiple,
+    memLocation,
+    fileLocation,
+    awsLocation,
+    awsLocationMismatch,
+} = require('../utils');
 
 const bucket = 'buckettestmultiplebackenddelete';
 const memObject = `memObject-${Date.now()}`;
@@ -13,11 +19,6 @@ const bigObject = `bigObject-${Date.now()}`;
 const mismatchObject = `mismatchOjbect-${Date.now()}`;
 const body = Buffer.from('I am a body', 'utf8');
 const bigBody = Buffer.alloc(10485760);
-const awsLocation = 'aws-test';
-const awsLocationMismatch = 'aws-test-mismatch';
-
-const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
-    || process.env.S3_END_TO_END) ? describe.skip : describe;
 
 describeSkipIfNotMultiple('Multiple backend delete', () => {
     withV4(sigCfg => {
@@ -36,13 +37,13 @@ describeSkipIfNotMultiple('Multiple backend delete', () => {
             .then(() => {
                 process.stdout.write('Putting object to mem\n');
                 const params = { Bucket: bucket, Key: memObject, Body: body,
-                    Metadata: { 'scal-location-constraint': 'mem' } };
+                    Metadata: { 'scal-location-constraint': memLocation } };
                 return s3.putObject(params);
             })
             .then(() => {
                 process.stdout.write('Putting object to file\n');
                 const params = { Bucket: bucket, Key: fileObject, Body: body,
-                    Metadata: { 'scal-location-constraint': 'file' } };
+                    Metadata: { 'scal-location-constraint': fileLocation } };
                 return s3.putObject(params);
             })
             .then(() => {

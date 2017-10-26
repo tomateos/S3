@@ -1,13 +1,15 @@
 const assert = require('assert');
-const AWS = require('aws-sdk');
 const async = require('async');
 const withV4 = require('../../support/withV4');
 const BucketUtility = require('../../../lib/utility/bucket-util');
-const { getRealAwsConfig } = require('../../support/awsConfig');
-const { config } = require('../../../../../../lib/Config');
+const {
+    describeSkipIfNotMultiple,
+    memLocation,
+    fileLocation,
+    awsLocation,
+    awsLocationMismatch,
+} = require('../utils');
 
-const awsLocation = 'aws-test';
-const awsLocationMismatch = 'aws-test-mismatch';
 const bucket = 'buckettestmultiplebackendget';
 const memObject = `memobject-${Date.now()}`;
 const fileObject = `fileobject-${Date.now()}`;
@@ -21,11 +23,6 @@ const bigBody = Buffer.alloc(10485760);
 const correctMD5 = 'be747eb4b75517bf6b3cf7c5fbb62f3a';
 const emptyMD5 = 'd41d8cd98f00b204e9800998ecf8427e';
 const bigMD5 = 'f1c9645dbc14efddc7d8a322685f26eb';
-
-let awsS3;
-
-const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
-    || process.env.S3_END_TO_END) ? describe.skip : describe;
 
 describe('Multiple backend get object', function testSuite() {
     this.timeout(30000);
@@ -182,18 +179,17 @@ describe('Multiple backend get object', function testSuite() {
         describeSkipIfNotMultiple('with objects in all available backends ' +
             '(mem/file/AWS)', () => {
             before(() => {
-                const awsConfig = getRealAwsConfig(awsLocation);
-                awsS3 = new AWS.S3(awsConfig);
-
                 process.stdout.write('Putting object to mem\n');
                 return s3.putObjectAsync({ Bucket: bucket, Key: memObject,
                     Body: body,
-                    Metadata: { 'scal-location-constraint': 'mem' } })
+                    Metadata: { 'scal-location-constraint': memLocation } })
                 .then(() => {
                     process.stdout.write('Putting object to file\n');
                     return s3.putObjectAsync({ Bucket: bucket, Key: fileObject,
                         Body: body,
-                        Metadata: { 'scal-location-constraint': 'file' } });
+                        Metadata:
+                        { 'scal-location-constraint': fileLocation },
+                    });
                 })
                 .then(() => {
                     process.stdout.write('Putting object to AWS\n');
@@ -205,7 +201,9 @@ describe('Multiple backend get object', function testSuite() {
                 .then(() => {
                     process.stdout.write('Putting 0-byte object to mem\n');
                     return s3.putObjectAsync({ Bucket: bucket, Key: emptyObject,
-                        Metadata: { 'scal-location-constraint': 'mem' } });
+                        Metadata:
+                        { 'scal-location-constraint': memLocation },
+                    });
                 })
                 .then(() => {
                     process.stdout.write('Putting 0-byte object to AWS\n');
@@ -278,20 +276,6 @@ describe('Multiple backend get object', function testSuite() {
                         assert.strictEqual(res.ETag, `"${bigMD5}"`);
                         done();
                     });
-            });
-            it('should return an error on get done to object deleted from AWS',
-            done => {
-                const awsBucket = config.locationConstraints[awsLocation].
-                    details.bucketName;
-                awsS3.deleteObject({ Bucket: awsBucket, Key: awsObject },
-                err => {
-                    assert.equal(err, null, 'Expected success but got ' +
-                        `error ${err}`);
-                    s3.getObject({ Bucket: bucket, Key: awsObject }, err => {
-                        assert.strictEqual(err.code, 'NetworkingError');
-                        done();
-                    });
-                });
             });
         });
 

@@ -3,12 +3,17 @@ const async = require('async');
 
 const BucketUtility = require('../../../lib/utility/bucket-util');
 const withV4 = require('../../support/withV4');
-const { config } = require('../../../../../../lib/Config');
-const { uniqName, getAzureClient, getAzureContainerName, getAzureKeys } =
-  require('../utils');
+const {
+    describeSkipIfNotMultiple,
+    uniqName,
+    getAzureClient,
+    getAzureContainerName,
+    getAzureKeys,
+    azureLocation,
+    azureLocationMismatch,
+} = require('../utils');
 
 const keyObject = 'deleteazure';
-const azureLocation = 'azuretest';
 const azureContainerName = getAzureContainerName();
 const keys = getAzureKeys();
 const azureClient = getAzureClient();
@@ -19,10 +24,6 @@ const azureTimeout = 20000;
 const nonExistingId = process.env.AWS_ON_AIR ?
     'MhhyTHhmZ4cxSi4Y9SMe5P7UJAz7HLJ9' :
     '3939393939393939393936493939393939393939756e6437';
-
-
-const describeSkipIfNotMultiple = (config.backends.data !== 'multiple'
-    || process.env.S3_END_TO_END) ? describe.skip : describe;
 
 describeSkipIfNotMultiple('Multiple backend delete object from Azure',
 function testSuite() {
@@ -88,6 +89,40 @@ function testSuite() {
                 });
             });
         });
+
+        describe('delete from Azure location with bucketMatch set to false',
+        () => {
+            beforeEach(function beforeF(done) {
+                this.currentTest.azureObject = uniqName(keyObject);
+                s3.putObject({
+                    Bucket: azureContainerName,
+                    Key: this.currentTest.azureObject,
+                    Body: normalBody,
+                    Metadata: {
+                        'scal-location-constraint': azureLocationMismatch,
+                    },
+                }, done);
+            });
+
+            it('should delete object', function itF(done) {
+                s3.deleteObject({
+                    Bucket: azureContainerName,
+                    Key: this.test.azureObject,
+                }, err => {
+                    assert.equal(err, null, 'Expected success ' +
+                        `but got error ${err}`);
+                    setTimeout(() =>
+                    azureClient.getBlobProperties(azureContainerName,
+                    `${azureContainerName}/${this.test.azureObject}`,
+                    err => {
+                        assert.strictEqual(err.statusCode, 404);
+                        assert.strictEqual(err.code, 'NotFound');
+                        return done();
+                    }), azureTimeout);
+                });
+            });
+        });
+
         describe('returning no error', () => {
             beforeEach(function beF(done) {
                 this.currentTest.azureObject = uniqName(keyObject);
@@ -162,6 +197,54 @@ function testSuite() {
                         return next();
                     }),
                 ], done);
+            });
+        });
+
+        describe('with ongoing MPU: ', () => {
+            beforeEach(function beF(done) {
+                this.currentTest.key = uniqName(keyObject);
+                const params = {
+                    Bucket: azureContainerName,
+                    Key: this.currentTest.key,
+                    Body: normalBody,
+                    Metadata: { 'scal-location-constraint': azureLocation },
+                };
+                s3.putObject(params, err => {
+                    assert.equal(err, null, 'Err putting object to Azure: ' +
+                        `${err}`);
+                    const params = {
+                        Bucket: azureContainerName,
+                        Key: this.currentTest.key,
+                        Metadata: { 'scal-location-constraint': azureLocation },
+                    };
+                    s3.createMultipartUpload(params, (err, res) => {
+                        assert.equal(err, null, 'Err initiating MPU on ' +
+                            `Azure: ${err}`);
+                        this.currentTest.uploadId = res.UploadId;
+                        setTimeout(() => done(), azureTimeout);
+                    });
+                });
+            });
+
+            afterEach(function afF(done) {
+                s3.abortMultipartUpload({
+                    Bucket: azureContainerName,
+                    Key: this.currentTest.key,
+                    UploadId: this.currentTest.uploadId,
+                }, err => {
+                    assert.equal(err, null, `Err aborting MPU: ${err}`);
+                    setTimeout(() => done(), azureTimeout);
+                });
+            });
+
+            it('should return InternalError', function itFn(done) {
+                s3.deleteObject({
+                    Bucket: azureContainerName,
+                    Key: this.test.key,
+                }, err => {
+                    assert.strictEqual(err.code, 'MPUinProgress');
+                    done();
+                });
             });
         });
     });

@@ -26,28 +26,28 @@ const testRequest = {
 
 const testChecks = [
     {
-        data: 'file',
-        locationSent: 'file',
+        data: 'file-test',
+        locationSent: 'file-test',
         parsedHost: '127.1.2.3',
-        locationReturn: 'file',
+        locationReturn: 'file-test',
         isError: false,
     },
     {
-        data: 'file',
+        data: 'file-test',
         locationSent: 'wronglocation',
         parsedHost: '127.1.0.0',
         locationReturn: undefined,
         isError: true,
     },
     {
-        data: 'file',
+        data: 'file-test',
         locationSent: '',
         parsedHost: '127.0.0.1',
         locationReturn: config.restEndpoints['127.0.0.1'],
         isError: false,
     },
     {
-        data: 'file',
+        data: 'file-test',
         locationSent: '',
         parsedHost: '127.3.2.1',
         locationReturn: 'us-east-1',
@@ -268,5 +268,30 @@ describe('bucketPut API', () => {
             assert.deepStrictEqual(err, errors.AccessDenied);
         });
         done();
+    });
+
+    it('should pick up updated rest endpoint config', done => {
+        const bucketName = 'new-loc-bucket-name';
+        const newRestEndpoint = 'newly.defined.rest.endpoint';
+        const newLocation = 'scality-us-west-1';
+
+        const req = Object.assign({}, testRequest, {
+            parsedHost: newRestEndpoint,
+            bucketName,
+        });
+
+        const newRestEndpoints = Object.assign({}, config.restEndpoints);
+        newRestEndpoints[newRestEndpoint] = newLocation;
+        config.setRestEndpoints(newRestEndpoints);
+
+        bucketPut(authInfo, req, log, err => {
+            assert.deepStrictEqual(err, null);
+            metadata.getBucket(bucketName, log, (err, bucketInfo) => {
+                assert.deepStrictEqual(err, null);
+                assert.deepStrictEqual(newLocation,
+                    bucketInfo.getLocationConstraint());
+                done();
+            });
+        });
     });
 });

@@ -17,6 +17,8 @@ const constants = require('../../constants');
 const { getRealAwsConfig } =
     require('../functional/aws-node-sdk/test/support/awsConfig');
 
+const memLocation = 'mem-test';
+const fileLocation = 'file-test';
 const awsLocation = 'aws-test';
 const awsLocationMismatch = 'aws-test-mismatch';
 const awsConfig = getRealAwsConfig(awsLocation);
@@ -27,9 +29,8 @@ const log = new DummyRequestLogger();
 const canonicalID = 'accessKey1';
 const authInfo = makeAuthInfo(canonicalID);
 const namespace = 'default';
-const bucketName = 'bucketname';
+const bucketName = `bucketname-${Date.now}`;
 
-const objectName = 'objectName';
 const body1 = Buffer.from('I am a body', 'utf8');
 const body2 = Buffer.from('I am a body with a different ETag', 'utf8');
 const mpuBucket = `${constants.mpuBucketPrefix}${bucketName}`;
@@ -42,6 +43,7 @@ const describeSkipIfE2E = process.env.S3_END_TO_END ? describe.skip : describe;
 
 function putPart(bucketLoc, mpuLoc, requestHost, cb,
 errorDescription) {
+    const objectName = `objectName-${Date.now()}`;
     const post = bucketLoc ? '<?xml version="1.0" encoding="UTF-8"?>' +
         '<CreateBucketConfiguration ' +
         'xmlns="http://s3.amazonaws.com/doc/2006-03-01/">' +
@@ -132,7 +134,7 @@ errorDescription) {
                 assert.strictEqual(keysInMPUkeyMap.length, 2);
                 assert.strictEqual(partETag, calculatedHash1);
             }
-            cb(testUploadId);
+            cb(objectName, testUploadId);
         });
     });
 }
@@ -168,7 +170,7 @@ function testSuite() {
     });
 
     it('should upload a part to file based on mpu location', done => {
-        putPart('mem', 'file', 'localhost', () => {
+        putPart(memLocation, fileLocation, 'localhost', () => {
             // if ds is empty, the object is not in mem, which means it
             // must be in file because those are the only possibilities
             // for unit tests
@@ -178,14 +180,15 @@ function testSuite() {
     });
 
     it('should put a part to mem based on mpu location', done => {
-        putPart('file', 'mem', 'localhost', () => {
+        putPart(fileLocation, memLocation, 'localhost', () => {
             assert.deepStrictEqual(ds[1].value, body1);
             done();
         });
     });
 
     it('should put a part to AWS based on mpu location', done => {
-        putPart('file', awsLocation, 'localhost', uploadId => {
+        putPart(fileLocation, awsLocation, 'localhost',
+        (objectName, uploadId) => {
             assert.deepStrictEqual(ds, []);
             listAndAbort(uploadId, null, objectName, done);
         });
@@ -193,7 +196,8 @@ function testSuite() {
 
     it('should replace part if two parts uploaded with same part number to AWS',
     done => {
-        putPart('file', awsLocation, 'localhost', uploadId => {
+        putPart(fileLocation, awsLocation, 'localhost',
+        (objectName, uploadId) => {
             assert.deepStrictEqual(ds, []);
             const partReqParams = {
                 bucketName,
@@ -216,21 +220,21 @@ function testSuite() {
 
     it('should upload part based on mpu location even if part ' +
         'location constraint is specified ', done => {
-        putPart('file', 'mem', 'localhost', () => {
+        putPart(fileLocation, memLocation, 'localhost', () => {
             assert.deepStrictEqual(ds[1].value, body1);
             done();
         });
     });
 
     it('should put a part to file based on bucket location', done => {
-        putPart('file', null, 'localhost', () => {
+        putPart(fileLocation, null, 'localhost', () => {
             assert.deepStrictEqual(ds, []);
             done();
         });
     });
 
     it('should put a part to mem based on bucket location', done => {
-        putPart('mem', null, 'localhost', () => {
+        putPart(memLocation, null, 'localhost', () => {
             assert.deepStrictEqual(ds[1].value, body1);
             done();
         });
@@ -238,7 +242,7 @@ function testSuite() {
 
     it('should put a part to AWS based on bucket location', done => {
         putPart(awsLocation, null, 'localhost',
-        uploadId => {
+        (objectName, uploadId) => {
             assert.deepStrictEqual(ds, []);
             listAndAbort(uploadId, null, objectName, done);
         });
@@ -247,7 +251,7 @@ function testSuite() {
     it('should put a part to AWS based on bucket location with bucketMatch ' +
     'set to true', done => {
         putPart(null, awsLocation, 'localhost',
-        uploadId => {
+        (objectName, uploadId) => {
             assert.deepStrictEqual(ds, []);
             listAndAbort(uploadId, null, objectName, done);
         });
@@ -256,7 +260,7 @@ function testSuite() {
     it('should put a part to AWS based on bucket location with bucketMatch ' +
     'set to false', done => {
         putPart(null, awsLocationMismatch, 'localhost',
-        uploadId => {
+        (objectName, uploadId) => {
             assert.deepStrictEqual(ds, []);
             listAndAbort(uploadId, null, `${bucketName}/${objectName}`, done);
         });

@@ -23,7 +23,7 @@ const someBody = 'teststring';
 
 describeSkipIfNotMultiple('AWS backend object put/get tagging with versioning',
 function testSuite() {
-    this.timeout(30000);
+    this.timeout(120000);
     const tags = { key1: 'value1', key2: 'value2' };
 
     withV4(sigCfg => {
@@ -233,7 +233,7 @@ function testSuite() {
             ], done);
         });
 
-        it('should return an InternalError if trying to put ' +
+        it('should return an ServiceUnavailable if trying to put ' +
         'tags from object that was deleted from AWS directly',
         done => {
             const key = `somekey-${Date.now()}`;
@@ -243,7 +243,7 @@ function testSuite() {
                 (awsVid, next) => awsS3.deleteObject({ Bucket: awsBucket,
                     Key: key, VersionId: awsVid }, next),
                 (delData, next) => putTaggingAndAssert(s3, { bucket, key, tags,
-                    expectedError: 'InternalError' }, next),
+                    expectedError: 'ServiceUnavailable' }, next),
             ], done);
         });
 
@@ -267,7 +267,7 @@ function testSuite() {
             ], done);
         });
 
-        it('should return an InternalError if trying to put ' +
+        it('should return an ServiceUnavailable if trying to put ' +
         'tags on version that was deleted from AWS directly',
         done => {
             const key = `somekey-${Date.now()}`;
@@ -278,7 +278,8 @@ function testSuite() {
                 (s3Vid, awsVid, next) => awsS3.deleteObject({ Bucket: awsBucket,
                     Key: key, VersionId: awsVid }, err => next(err, s3Vid)),
                 (s3Vid, next) => putTaggingAndAssert(s3, { bucket, key, tags,
-                    versionId: s3Vid, expectedError: 'InternalError' }, next),
+                    versionId: s3Vid, expectedError:
+                    'ServiceUnavailable' }, next),
             ], done);
         });
     });

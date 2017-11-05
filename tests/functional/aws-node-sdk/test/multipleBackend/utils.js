@@ -20,7 +20,8 @@ const azureLocation2 = 'azuretest2';
 const azureLocationMismatch = 'azuretestmismatch';
 const versioningEnabled = { Status: 'Enabled' };
 const versioningSuspended = { Status: 'Suspended' };
-const awsTimeout = 10000;
+const awsFirstTimeout = 10000;
+const awsSecondTimeout = 30000;
 let describeSkipIfNotMultiple = describe.skip;
 let awsS3;
 let awsBucket;
@@ -61,44 +62,35 @@ const utils = {
 utils.uniqName = name => `${name}${new Date().getTime()}`;
 
 utils.getAzureClient = () => {
-    let isTestingAzure;
-    let azureBlobEndpoint;
-    let azureBlobSAS;
-    let azureClient;
-    if (process.env[`${azureLocation}_AZURE_BLOB_ENDPOINT`]) {
-        isTestingAzure = true;
-        azureBlobEndpoint = process.env[`${azureLocation}_AZURE_BLOB_ENDPOINT`];
-    } else if (config.locationConstraints[azureLocation] &&
-          config.locationConstraints[azureLocation].details &&
-          config.locationConstraints[azureLocation].details.azureBlobEndpoint) {
-        isTestingAzure = true;
-        azureBlobEndpoint =
-          config.locationConstraints[azureLocation].details.azureBlobEndpoint;
-    } else {
-        isTestingAzure = false;
-    }
+    const params = {};
+    const envMap = {
+        azureStorageEndpoint: 'AZURE_STORAGE_ENDPOINT',
+        azureStorageAccountName: 'AZURE_STORAGE_ACCOUNT_NAME',
+        azureStorageAccessKey: 'AZURE_STORAGE_ACCESS_KEY',
+    };
 
-    if (isTestingAzure) {
-        if (process.env[`${azureLocation}_AZURE_BLOB_SAS`]) {
-            azureBlobSAS = process.env[`${azureLocation}_AZURE_BLOB_SAS`];
-            isTestingAzure = true;
-        } else if (config.locationConstraints[azureLocation] &&
-            config.locationConstraints[azureLocation].details &&
-            config.locationConstraints[azureLocation].details.azureBlobSAS
-        ) {
-            azureBlobSAS = config.locationConstraints[azureLocation].details
-              .azureBlobSAS;
-            isTestingAzure = true;
-        } else {
-            isTestingAzure = false;
+    const isTestingAzure = Object.keys(envMap).every(key => {
+        const envVariable = process.env[`${azureLocation}_${envMap[key]}`];
+        if (envVariable) {
+            params[key] = envVariable;
+            return true;
         }
+        if (config.locationConstraints[azureLocation] &&
+            config.locationConstraints[azureLocation].details &&
+            config.locationConstraints[azureLocation].details[key]) {
+            params[key] =
+                config.locationConstraints[azureLocation].details[key];
+            return true;
+        }
+        return false;
+    });
+
+    if (!isTestingAzure) {
+        return undefined;
     }
 
-    if (isTestingAzure) {
-        azureClient = azure.createBlobServiceWithSas(azureBlobEndpoint,
-          azureBlobSAS);
-    }
-    return azureClient;
+    return azure.createBlobService(params.azureStorageAccountName,
+        params.azureStorageAccessKey, params.azureStorageEndpoint);
 };
 
 utils.getAzureContainerName = () => {
@@ -226,14 +218,23 @@ utils.getAndAssertResult = (s3, params, cb) => {
         });
 };
 
-utils.awsGetLatestVerId = (key, body, cb) => {
+utils.awsGetLatestVerId = (key, body, cb, isRetry) => {
     const getObject = awsS3.getObject.bind(awsS3);
-    return setTimeout(getObject, awsTimeout, { Bucket: awsBucket, Key: key },
+    const timeout = isRetry ? awsSecondTimeout : awsFirstTimeout;
+    return setTimeout(getObject, timeout, { Bucket: awsBucket, Key: key },
         (err, result) => {
+            if (err && !isRetry) {
+                // retry operation with longer timeout
+                return utils.awsGetLatestVerId(key, body, cb, true);
+            }
             assert.strictEqual(err, null, 'Expected success ' +
                 `getting object from AWS, got error ${err}`);
             const resultMD5 = utils.expectedETag(result.Body, false);
             const expectedMD5 = utils.expectedETag(body, false);
+            if (resultMD5 !== expectedMD5 && !isRetry) {
+                // retry operation with longer timeout
+                return utils.awsGetLatestVerId(key, body, cb, true);
+            }
             assert.strictEqual(resultMD5, expectedMD5,
                 'expected different body');
             return cb(null, result.VersionId);
